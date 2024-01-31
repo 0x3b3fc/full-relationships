@@ -6,39 +6,48 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\API\UserRequest;
 use App\Http\Resources\API\UserResource;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class UserController extends Controller
 {
-    public function index()
+    private $user;
+
+    public function __construct(User $user)
     {
-        return UserResource::collection(User::with(['phone', 'roles'])->get());
+        $this->user = $user;
     }
 
-    public function store(UserRequest $request)
+    public function index(): UserResource|AnonymousResourceCollection
+    {
+        return UserResource::collection($this->user->with(['phone', 'roles'])->get());
+    }
+
+    public function store(UserRequest $request): UserResource
     {
         $validated = $request->validated();
-        try {
-            $user = User::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'password' => $validated['password'],
-            ]);
-            return new UserResource($user);
-        } catch (\Exception $exception) {
-            return response()->json($exception->getMessage());
-        }
+
+        $user = $this->user->create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $validated['password'],
+        ]);
+
+        return new UserResource($user);
     }
 
-    public function sync()
+    public function sync(): UserResource|JsonResponse
     {
-        $user = User::find(1);
-        $roles = [1, 3];
         try {
+            $user = $this->user->find(1);
+            $roles = [1, 3];
+
             $user->roles()->sync($roles);
             $user->load(['phone', 'roles']);
+
             return new UserResource($user);
         } catch (\Exception $exception) {
-            return response()->json($exception->getMessage());
+            return response()->json(['error' => $exception->getMessage()], 500);
         }
     }
 }
